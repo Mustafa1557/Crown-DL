@@ -1,0 +1,8 @@
+python-telegram-bot
+flask
+gTTS
+PyMuPDF
+pdf2docx
+PyPDF2
+deep-translator
+google-generativeai

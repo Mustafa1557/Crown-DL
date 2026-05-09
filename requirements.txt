@@ -1,8 +1,7 @@
 python-telegram-bot
+google-generativeai
 flask
-gTTS
 PyMuPDF
 pdf2docx
-PyPDF2
+gTTS
 deep-translator
-google-generativeai

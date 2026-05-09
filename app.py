@@ -8,46 +8,40 @@ from pdf2docx import Converter
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# --- 1. إعداد Flask ---
+# --- 1. إعداد Flask (عشان السيرفر يفضل صاحي) ---
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Gemini Bot is Live!"
+def home(): return "Direct Key Mode is Online!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- 2. الإعدادات (قراءة من راندر) ---
-# الكود حيمشي يفتش في راندر عن الاسم ده بالضبط
-GEMINI_KEY = os.environ.get('GOOGLE_API_KEY') 
-TOKEN = os.environ.get('BOT_TOKEN')
-ADMIN_ID = os.environ.get('ADMIN_ID')
+# --- 2. البيانات المباشرة (Direct Configuration) ---
+# وضعنا كل شيء هنا مباشرة للتجربة النهائية
+GEMINI_KEY = "AIzaSyCO5SisFRfssgoyH0tjfoAtBjfalm0OP6U"
+BOT_TOKEN = "8647878698:AAEbsrfsgydzS0opvQkymNeArAm7JV3VlK8"
+MY_ADMIN_ID = "8168754101"
 DOWNLOAD_DIR = "downloads"
 
 # تهيئة Gemini
-if GEMINI_KEY:
-    try:
-        genai.configure(api_key=GEMINI_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ Gemini Link Active")
-    except Exception as e:
-        print(f"❌ Gemini Setup Error: {e}")
+try:
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    print("✅ Gemini Configured Successfully!")
+except Exception as e:
+    print(f"❌ Gemini Error: {e}")
 
 async def notify_admin(context, message):
-    if ADMIN_ID:
-        try: await context.bot.send_message(chat_id=ADMIN_ID, text=f"📢 تقرير النظم:\n{message}")
-        except: pass
-
-def cleanup(file_path):
     try:
-        if os.path.exists(file_path): os.remove(file_path)
+        await context.bot.send_message(chat_id=MY_ADMIN_ID, text=f"📢 تقرير المراقبة:\n{message}")
     except: pass
 
 # --- 3. وظائف البوت ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.message.from_user.first_name
-    await update.message.reply_text(f"أهلاً يا {user_name}! 👋\nأنا مساعدك الذكي. اسألني أي سؤال أو أرسل ملف PDF.")
+    await update.message.reply_text(f"أهلاً {user_name}! 👋\nتم تشغيل البوت بنظام المفاتيح المباشرة.\nأنا جاهز الآن، جرب اسألني أي سؤال.")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
@@ -56,8 +50,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = model.generate_content(user_text)
         await update.message.reply_text(response.text)
+        # إشعار لك في الخاص
+        await notify_admin(context, f"المستخدم {update.message.from_user.first_name} سأل: {user_text}")
     except Exception as e:
-        await update.message.reply_text("عذراً، لم أستطع الوصول لعقلي الإلكتروني (Gemini). تأكد من إعدادات المفتاح.")
+        await update.message.reply_text(f"حدث خطأ في Gemini: {str(e)}")
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
@@ -71,7 +67,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [[InlineKeyboardButton("ترجمة (Gemini) 🇸🇩", callback_data='translate')],
                 [InlineKeyboardButton("تحويل لـ Word 📝", callback_data='word')]]
-    await update.message.reply_text(f"تم استلام {doc.file_name}. اختر العملية:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(f"استلمت {doc.file_name}. ماذا نفعل؟", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -80,25 +76,26 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not pdf_path: return
 
     if query.data == 'translate':
-        await query.edit_message_text("🔄 جاري الترجمة الاحترافية...")
+        await query.edit_message_text("🔄 جاري الترجمة...")
         try:
             doc = fitz.open(pdf_path)
             text = "".join([page.get_text() for page in doc])
-            response = model.generate_content(f"ترجم النص التالي للعربية بوضوح: {text[:2000]}")
+            response = model.generate_content(f"ترجم هذا النص الطبي: {text[:1500]}")
             await query.message.reply_text(response.text)
         except Exception as e:
-            await query.message.reply_text(f"حدث خطأ: {str(e)}")
+            await query.message.reply_text(f"خطأ: {str(e)}")
 
 def main():
     threading.Thread(target=run_flask, daemon=True).start()
-    if not TOKEN: return
-    application = Application.builder().token(TOKEN).build()
+    # هنا استخدمنا BOT_TOKEN المكتوب فوق مباشرة
+    application = Application.builder().token(BOT_TOKEN).build()
+    
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     application.add_handler(CallbackQueryHandler(button_callback))
     
-    # أهم سطر لمنع التعارض (Conflict Error)
+    # مسح التراكمات القديمة للرسائل
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
